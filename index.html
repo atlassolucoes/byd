@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BYD Monitor">
+<title>BYD Dolphin — Monitor de Energia</title>
+<style>
+  :root {
+    --verde: #1D9E75;
+    --verde-claro: #E1F5EE;
+    --verde-escuro: #085041;
+    --azul: #185FA5;
+    --azul-claro: #E6F1FB;
+    --laranja: #BA7517;
+    --laranja-claro: #FAEEDA;
+    --roxo: #534AB7;
+    --roxo-claro: #EEEDFE;
+    --cinza: #5F5E5A;
+    --cinza-claro: #F1EFE8;
+    --borda: #D3D1C7;
+    --bg: #ffffff;
+    --texto: #2C2C2A;
+    --texto-sec: #5F5E5A;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18;
+      --texto: #e8e6e0;
+      --texto-sec: #9c9a92;
+      --cinza-claro: #2a2a28;
+      --borda: #3a3a38;
+      --verde-claro: #0a2a22;
+      --azul-claro: #0a1e36;
+      --laranja-claro: #2a1e08;
+      --roxo-claro: #1a1840;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--cinza-claro); color: var(--texto); font-size: 15px; line-height: 1.5; }
+
+  /* Header */
+  header { background: var(--verde-escuro); color: #fff; padding: 16px 20px; position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+  header span { font-size: 12px; opacity: 0.7; }
+
+  /* Config banner */
+  #config-banner { background: var(--laranja-claro); border: 1px solid #EF9F27; color: var(--laranja); padding: 12px 20px; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+  #config-banner a { color: var(--laranja); font-weight: 600; text-decoration: underline; cursor: pointer; }
+
+  /* Nav tabs */
+  nav { background: var(--bg); border-bottom: 1px solid var(--borda); display: flex; overflow-x: auto; scrollbar-width: none; }
+  nav::-webkit-scrollbar { display: none; }
+  nav button { flex: 0 0 auto; padding: 14px 18px; font-size: 13px; font-weight: 500; border: none; background: none; color: var(--texto-sec); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: all 0.15s; }
+  nav button.ativa { color: var(--verde); border-bottom-color: var(--verde); }
+  nav button:hover { color: var(--texto); }
+
+  /* Main */
+  main { max-width: 680px; margin: 0 auto; padding: 20px 16px 40px; }
+
+  /* Seções */
+  .secao { display: none; }
+  .secao.ativa { display: block; }
+
+  /* Cards métricas */
+  .metricas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .metrica { background: var(--bg); border-radius: var(--radius-sm); padding: 14px 16px; border: 1px solid var(--borda); }
+  .metrica-label { font-size: 11px; color: var(--texto-sec); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .metrica-valor { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; color: var(--verde); }
+  .metrica-sub { font-size: 11px; color: var(--texto-sec); margin-top: 2px; }
+  .metrica.destaque { grid-column: 1 / -1; background: var(--verde-claro); border-color: var(--verde); }
+  .metrica.destaque .metrica-valor { font-size: 28px; color: var(--verde-escuro); }
+
+  /* Card formulário */
+  .card { background: var(--bg); border-radius: var(--radius); border: 1px solid var(--borda); padding: 20px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: var(--texto); }
+  .campo { margin-bottom: 14px; }
+  .campo label { display: block; font-size: 12px; font-weight: 500; color: var(--texto-sec); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .campo input, .campo select, .campo textarea {
+    width: 100%; padding: 11px 13px; border: 1px solid var(--borda); border-radius: var(--radius-sm);
+    font-size: 15px; color: var(--texto); background: var(--bg); outline: none; transition: border-color 0.15s;
+    -webkit-appearance: none;
+  }
+  .campo input:focus, .campo select:focus { border-color: var(--verde); }
+  .campo textarea { resize: vertical; min-height: 70px; }
+  .campos-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .campos-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+  /* Bateria visual */
+  .bateria-preview { display: flex; align-items: center; gap: 12px; background: var(--cinza-claro); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 14px; }
+  .bat-barra { flex: 1; height: 24px; background: var(--borda); border-radius: 6px; overflow: hidden; position: relative; }
+  .bat-fill { height: 100%; background: var(--verde); border-radius: 6px; transition: width 0.3s; }
+  .bat-fill.baixa { background: #E24B4A; }
+  .bat-fill.media { background: #BA7517; }
+  .bat-texto { font-size: 13px; font-weight: 600; color: var(--texto); min-width: 80px; text-align: right; }
+
+  /* Custo estimado */
+  .custo-box { background: var(--verde-claro); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+  .custo-label { font-size: 12px; color: var(--verde-escuro); }
+  .custo-valor { font-size: 20px; font-weight: 700; color: var(--verde-escuro); }
+
+  /* Botões */
+  .btn { width: 100%; padding: 14px; border-radius: var(--radius-sm); border: none; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity 0.15s, transform 0.1s; }
+  .btn:active { transform: scale(0.98); }
+  .btn-verde { background: var(--verde); color: #fff; }
+  .btn-verde:hover { opacity: 0.9; }
+  .btn-cinza { background: var(--cinza-claro); color: var(--texto); border: 1px solid var(--borda); }
+  .btn-sm { width: auto; padding: 8px 14px; font-size: 13px; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Toast */
+  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #2C2C2A; color: #fff; padding: 12px 20px; border-radius: 99px; font-size: 14px; font-weight: 500; transition: transform 0.3s; z-index: 999; white-space: nowrap; }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.erro { background: #A32D2D; }
+
+  /* Tabela histórico */
+  .tabela-wrap { overflow-x: auto; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { font-size: 11px; font-weight: 600; color: var(--texto-sec); text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--borda); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  td { padding: 10px 10px; border-bottom: 1px solid var(--borda); color: var(--texto); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .vazio { text-align: center; color: var(--texto-sec); font-style: italic; padding: 30px 0; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  .badge-casa { background: var(--verde-claro); color: var(--verde-escuro); }
+  .badge-posto { background: var(--azul-claro); color: var(--azul); }
+  .badge-antes { background: var(--laranja-claro); color: var(--laranja); }
+  .badge-depois { background: var(--verde-claro); color: var(--verde-escuro); }
+  .badge-rotina { background: var(--cinza-claro); color: var(--cinza); }
+
+  /* Seção config */
+  .config-campo { margin-bottom: 20px; }
+  .config-campo label { display: block; font-size: 12px; font-weight: 600; color: var(--texto-sec); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .config-campo input { width: 100%; padding: 11px 13px; border: 1px solid var(--borda); border-radius: var(--radius-sm); font-size: 14px; color: var(--texto); background: var(--bg); font-family: monospace; }
+  .config-campo input:focus { outline: none; border-color: var(--verde); }
+  .config-info { background: var(--azul-claro); border-radius: var(--radius-sm); padding: 14px; font-size: 13px; color: var(--azul); line-height: 1.7; margin-bottom: 16px; }
+  .config-info strong { font-weight: 600; }
+  .config-info ol { padding-left: 18px; margin-top: 8px; }
+  .config-info code { background: rgba(24,95,165,0.15); padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 12px; }
+
+  /* Separador */
+  .sep { height: 1px; background: var(--borda); margin: 20px 0; }
+
+  /* Loading spinner */
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ BYD Dolphin</h1>
+  <span id="status-api">● offline</span>
+</header>
+
+<div id="config-banner" style="display:none">
+  ⚙️ Configure a URL do Apps Script para salvar no Google Sheets.
+  <a onclick="irParaConfig()">Configurar agora →</a>
+</div>
+
+<nav>
+  <button class="ativa" onclick="irPara('resumo')">Resumo</button>
+  <button onclick="irPara('carga-casa')">Carga em casa</button>
+  <button onclick="irPara('posto')">Posto externo</button>
+  <button onclick="irPara('medidor')">Medidor</button>
+  <button onclick="irPara('fatura')">Fatura de luz</button>
+  <button onclick="irPara('historico')">Histórico</button>
+  <button onclick="irPara('config')">Config</button>
+</nav>
+
+<main>
+
+<!-- ── RESUMO ─────────────────────────────── -->
+<div id="secao-resumo" class="secao ativa">
+  <div class="metricas">
+    <div class="metrica destaque">
+      <div class="metrica-label">Total gasto com o BYD</div>
+      <div class="metrica-valor" id="r-total">R$ —</div>
+      <div class="metrica-sub">casa + postos externos</div>
+    </div>
+    <div class="metrica">
+      <div class="metrica-label">Em casa</div>
+      <div class="metrica-valor" id="r-casa" style="font-size:18px">R$ —</div>
+    </div>
+    <div class="metrica">
+      <div class="metrica-label">Em postos</div>
+      <div class="metrica-valor" id="r-postos" style="font-size:18px">R$ —</div>
+    </div>
+    <div class="metrica">
+      <div class="metrica-label">kWh em casa</div>
+      <div class="metrica-valor" id="r-kwh-casa" style="font-size:18px">—</div>
+    </div>
+    <div class="metrica">
+      <div class="metrica-label">kWh em postos</div>
+      <div class="metrica-valor" id="r-kwh-postos" style="font-size:18px">—</div>
+    </div>
+    <div class="metrica">
+      <div class="metrica-label">Cargas em casa</div>
+      <div class="metrica-valor" id="r-n-casa" style="font-size:18px">—</div>
+    </div>
+    <div class="metrica">
+      <div class="metrica-label">Cargas em postos</div>
+      <div class="metrica-valor" id="r-n-postos" style="font-size:18px">—</div>
+    </div>
+    <div class="metrica">
+      <div class="metrica-label">Última fatura — carro</div>
+      <div class="metrica-valor" id="r-fatura-carro" style="font-size:18px">R$ —</div>
+    </div>
+  </div>
+  <button class="btn btn-cinza" onclick="carregarResumo()" style="margin-top:4px">Atualizar dados</button>
+</div>
+
+<!-- ── CARGA EM CASA ──────────────────────── -->
+<div id="secao-carga-casa" class="secao">
+  <div class="card">
+    <h2>Registrar carga em casa</h2>
+
+    <div class="bateria-preview">
+      <div class="bat-barra">
+        <div class="bat-fill" id="bat-fill" style="width:50%"></div>
+      </div>
+      <div class="bat-texto" id="bat-texto">50% → 80%</div>
+    </div>
+
+    <div class="custo-box" id="custo-box">
+      <div>
+        <div class="custo-label">Custo estimado</div>
+        <div class="custo-label" id="custo-kwh" style="font-size:11px; opacity:0.7">— kWh</div>
+      </div>
+      <div class="custo-valor" id="custo-valor">R$ —</div>
+    </div>
+
+    <div class="campos-2">
+      <div class="campo">
+        <label>Bateria inicial (%)</label>
+        <input type="number" id="c-bat-ini" value="20" min="0" max="100" oninput="atualizarBateria()">
+      </div>
+      <div class="campo">
+        <label>Bateria final (%)</label>
+        <input type="number" id="c-bat-fim" value="80" min="0" max="100" oninput="atualizarBateria()">
+      </div>
+    </div>
+    <div class="campos-2">
+      <div class="campo">
+        <label>Data e hora</label>
+        <input type="datetime-local" id="c-data">
+      </div>
+      <div class="campo">
+        <label>Km atual</label>
+        <input type="number" id="c-km" placeholder="ex: 12.500">
+      </div>
+    </div>
+    <div class="campo">
+      <label>Observação</label>
+      <input type="text" id="c-obs" placeholder="ex: carregamento noturno">
+    </div>
+    <button class="btn btn-verde" id="btn-salvar-carga" onclick="salvarCarga()">Salvar carga</button>
+  </div>
+</div>
+
+<!-- ── POSTO EXTERNO ──────────────────────── -->
+<div id="secao-posto" class="secao">
+  <div class="card">
+    <h2>Registrar carga em posto</h2>
+    <div class="campos-2">
+      <div class="campo">
+        <label>Data e hora</label>
+        <input type="datetime-local" id="p-data">
+      </div>
+      <div class="campo">
+        <label>Km atual</label>
+        <input type="number" id="p-km" placeholder="ex: 12.500">
+      </div>
+    </div>
+    <div class="campos-2">
+      <div class="campo">
+        <label>Nome do posto / app</label>
+        <input type="text" id="p-nome" placeholder="ex: BYD Charge, Tupinambás">
+      </div>
+      <div class="campo">
+        <label>Cidade</label>
+        <input type="text" id="p-cidade" placeholder="ex: Sobral - CE">
+      </div>
+    </div>
+    <div class="campos-2">
+      <div class="campo">
+        <label>kWh carregados</label>
+        <input type="number" id="p-kwh" step="0.1" placeholder="ex: 25.5" oninput="atualizarCustoPosto()">
+      </div>
+      <div class="campo">
+        <label>Valor pago (R$)</label>
+        <input type="number" id="p-valor" step="0.01" placeholder="ex: 38.00" oninput="atualizarCustoPosto()">
+      </div>
+    </div>
+    <div class="custo-box" id="custo-posto-box" style="display:none">
+      <div class="custo-label">R$/kWh</div>
+      <div class="custo-valor" id="custo-posto-kwh">—</div>
+    </div>
+    <div class="campo">
+      <label>Observação</label>
+      <input type="text" id="p-obs" placeholder="ex: carregamento rápido 50kW">
+    </div>
+    <button class="btn btn-verde" id="btn-salvar-posto" onclick="salvarPosto()">Salvar posto</button>
+  </div>
+</div>
+
+<!-- ── MEDIDOR ────────────────────────────── -->
+<div id="secao-medidor" class="secao">
+  <div class="card">
+    <h2>Leitura do medidor</h2>
+    <div class="campos-2">
+      <div class="campo">
+        <label>Data e hora</label>
+        <input type="datetime-local" id="m-data">
+      </div>
+      <div class="campo">
+        <label>Tipo</label>
+        <select id="m-tipo">
+          <option value="Antes do carro">Antes de carregar</option>
+          <option value="Depois do carro">Depois de carregar</option>
+          <option value="Rotina manhã">Rotina — manhã</option>
+          <option value="Rotina noite">Rotina — noite</option>
+          <option value="Leitura da fatura">Leitura da fatura</option>
+        </select>
+      </div>
+    </div>
+    <div class="campos-2">
+      <div class="campo">
+        <label>Leitura do medidor (kWh)</label>
+        <input type="number" id="m-leitura" step="0.01" placeholder="ex: 1234.5">
+      </div>
+      <div class="campo">
+        <label>Km atual do carro</label>
+        <input type="number" id="m-km" placeholder="opcional">
+      </div>
+    </div>
+    <div class="campo">
+      <label>Observação</label>
+      <input type="text" id="m-obs" placeholder="opcional">
+    </div>
+    <button class="btn btn-verde" id="btn-salvar-medidor" onclick="salvarMedidor()">Salvar leitura</button>
+  </div>
+</div>
+
+<!-- ── FATURA ─────────────────────────────── -->
+<div id="secao-fatura" class="secao">
+  <div class="card">
+    <h2>Registrar fatura de luz</h2>
+    <div class="campos-2">
+      <div class="campo">
+        <label>Mês de referência</label>
+        <input type="month" id="f-mes">
+      </div>
+      <div class="campo">
+        <label>Vencimento</label>
+        <input type="date" id="f-venc">
+      </div>
+    </div>
+    <div class="campos-2">
+      <div class="campo">
+        <label>kWh total (fatura)</label>
+        <input type="number" id="f-kwh" step="0.1" placeholder="ex: 320" oninput="atualizarFatura()">
+      </div>
+      <div class="campo">
+        <label>Valor total (R$)</label>
+        <input type="number" id="f-valor" step="0.01" placeholder="ex: 280.00" oninput="atualizarFatura()">
+      </div>
+    </div>
+    <div class="campos-2">
+      <div class="campo">
+        <label>kWh estimado do carro</label>
+        <input type="number" id="f-kwh-carro" step="0.1" placeholder="ex: 45" oninput="atualizarFatura()">
+      </div>
+      <div class="campo">
+        <label>Bandeira tarifária</label>
+        <select id="f-bandeira">
+          <option value="Verde">Verde</option>
+          <option value="Amarela">Amarela</option>
+          <option value="Vermelha 1">Vermelha 1</option>
+          <option value="Vermelha 2">Vermelha 2</option>
+          <option value="Escassez">Escassez hídrica</option>
+        </select>
+      </div>
+    </div>
+    <div id="fatura-preview" style="display:none">
+      <div class="metricas" style="margin-bottom:14px">
+        <div class="metrica">
+          <div class="metrica-label">Custo carro</div>
+          <div class="metrica-valor" id="f-custo-carro" style="font-size:18px">R$ —</div>
+        </div>
+        <div class="metrica">
+          <div class="metrica-label">% da conta</div>
+          <div class="metrica-valor" id="f-perc-carro" style="font-size:18px">—%</div>
+        </div>
+        <div class="metrica">
+          <div class="metrica-label">Tarifa (R$/kWh)</div>
+          <div class="metrica-valor" id="f-tarifa" style="font-size:18px">—</div>
+        </div>
+      </div>
+    </div>
+    <div class="campo">
+      <label>Observação</label>
+      <input type="text" id="f-obs" placeholder="opcional">
+    </div>
+    <button class="btn btn-verde" id="btn-salvar-fatura" onclick="salvarFatura()">Salvar fatura</button>
+  </div>
+</div>
+
+<!-- ── HISTÓRICO ──────────────────────────── -->
+<div id="secao-historico" class="secao">
+  <div class="card">
+    <h2>Histórico de registros</h2>
+    <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap">
+      <button class="btn btn-cinza btn-sm hist-btn ativa" onclick="verHistorico('Carregamentos')">Cargas em casa</button>
+      <button class="btn btn-cinza btn-sm hist-btn" onclick="verHistorico('Postos')">Postos</button>
+      <button class="btn btn-cinza btn-sm hist-btn" onclick="verHistorico('Medidor')">Medidor</button>
+      <button class="btn btn-cinza btn-sm hist-btn" onclick="verHistorico('Faturas')">Faturas</button>
+    </div>
+    <div class="tabela-wrap">
+      <table id="tabela-hist">
+        <thead id="thead-hist"></thead>
+        <tbody id="tbody-hist"><tr><td class="vazio" colspan="99">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── CONFIG ─────────────────────────────── -->
+<div id="secao-config" class="secao">
+  <div class="card">
+    <h2>Configuração</h2>
+    <div class="config-info">
+      <strong>Como configurar em 3 passos:</strong>
+      <ol>
+        <li>Abra a planilha no Google Sheets</li>
+        <li>Vá em <code>Extensões → Apps Script</code></li>
+        <li>Cole o arquivo <code>Code.gs</code>, clique em <strong>Implantar → Novo Implantação</strong> como <strong>App da Web</strong>, acesso para <strong>Qualquer pessoa</strong>, e copie a URL gerada</li>
+      </ol>
+    </div>
+    <div class="config-campo">
+      <label>URL do Apps Script (Web App)</label>
+      <input type="url" id="cfg-url" placeholder="https://script.google.com/macros/s/...">
+    </div>
+    <div class="sep"></div>
+    <div class="config-campo">
+      <label>Tarifa de energia (R$/kWh)</label>
+      <input type="number" id="cfg-tarifa" value="0.80" step="0.01">
+    </div>
+    <div class="config-campo">
+      <label>Eficiência do carregador (%)</label>
+      <input type="number" id="cfg-eficiencia" value="90" min="50" max="100">
+    </div>
+    <div class="config-campo">
+      <label>Capacidade útil da bateria (kWh)</label>
+      <input type="number" id="cfg-bateria" value="38.88" step="0.01">
+    </div>
+    <button class="btn btn-verde" onclick="salvarConfig()">Salvar configurações</button>
+    <div class="sep"></div>
+    <a href="https://docs.google.com/spreadsheets/d/1dyVsmvYX1rPnfNKMRh9qtEVlh84zrewA9fKB2TO4ivw/edit" target="_blank"
+      style="display:block; text-align:center; color:var(--verde); font-size:14px; font-weight:600; text-decoration:none; padding:12px">
+      Abrir planilha no Google Sheets ↗
+    </a>
+  </div>
+</div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+// ── Estado global ──
+let CONFIG = {
+  url: '',
+  tarifa: 0.80,
+  eficiencia: 0.90,
+  bateria: 38.88
+};
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', () => {
+  carregarConfigLocal();
+  preencherDataHoraAtual();
+  atualizarBateria();
+  verificarConexao();
+  carregarResumo();
+  verHistorico('Carregamentos');
+});
+
+function carregarConfigLocal() {
+  try {
+    const salvo = JSON.parse(localStorage.getItem('byd_config') || '{}');
+    CONFIG = { ...CONFIG, ...salvo };
+    if (document.getElementById('cfg-url')) {
+      document.getElementById('cfg-url').value = CONFIG.url || '';
+      document.getElementById('cfg-tarifa').value = CONFIG.tarifa;
+      document.getElementById('cfg-eficiencia').value = Math.round(CONFIG.eficiencia * 100);
+      document.getElementById('cfg-bateria').value = CONFIG.bateria;
+    }
+    if (!CONFIG.url) {
+      document.getElementById('config-banner').style.display = 'flex';
+    }
+  } catch(e) {}
+}
+
+function salvarConfig() {
+  CONFIG.url = document.getElementById('cfg-url').value.trim();
+  CONFIG.tarifa = parseFloat(document.getElementById('cfg-tarifa').value) || 0.80;
+  CONFIG.eficiencia = (parseFloat(document.getElementById('cfg-eficiencia').value) || 90) / 100;
+  CONFIG.bateria = parseFloat(document.getElementById('cfg-bateria').value) || 38.88;
+  localStorage.setItem('byd_config', JSON.stringify(CONFIG));
+  document.getElementById('config-banner').style.display = CONFIG.url ? 'none' : 'flex';
+  toast('Configurações salvas!');
+  verificarConexao();
+}
+
+// ── Navegação ──
+function irPara(id) {
+  document.querySelectorAll('.secao').forEach(s => s.classList.remove('ativa'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('ativa'));
+  document.getElementById('secao-' + id).classList.add('ativa');
+  document.querySelectorAll('nav button')[['resumo','carga-casa','posto','medidor','fatura','historico','config'].indexOf(id)].classList.add('ativa');
+  preencherDataHoraAtual();
+}
+
+function irParaConfig() { irPara('config'); }
+
+function preencherDataHoraAtual() {
+  const agora = new Date();
+  const local = agora.toISOString().slice(0, 16);
+  ['c-data','p-data','m-data'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = local;
+  });
+  const fMes = document.getElementById('f-mes');
+  if (fMes && !fMes.value) fMes.value = agora.toISOString().slice(0,7);
+}
+
+// ── Bateria visual ──
+function atualizarBateria() {
+  const ini = parseFloat(document.getElementById('c-bat-ini').value) || 0;
+  const fim = parseFloat(document.getElementById('c-bat-fim').value) || 0;
+  const fill = document.getElementById('bat-fill');
+  const texto = document.getElementById('bat-texto');
+  fill.style.width = Math.max(ini, 0) + '%';
+  fill.classList.toggle('baixa', ini < 20);
+  fill.classList.toggle('media', ini >= 20 && ini < 50);
+
+  const kwhCarregado = CONFIG.bateria * (fim - ini) / 100 / CONFIG.eficiencia;
+  const custo = kwhCarregado * CONFIG.tarifa;
+
+  texto.textContent = ini + '% → ' + fim + '%';
+  document.getElementById('custo-valor').textContent = custo > 0 ? 'R$ ' + custo.toFixed(2) : 'R$ —';
+  document.getElementById('custo-kwh').textContent = kwhCarregado > 0 ? kwhCarregado.toFixed(2) + ' kWh estimados' : '—';
+}
+
+// ── Custo posto ──
+function atualizarCustoPosto() {
+  const kwh = parseFloat(document.getElementById('p-kwh').value);
+  const valor = parseFloat(document.getElementById('p-valor').value);
+  const box = document.getElementById('custo-posto-box');
+  if (kwh > 0 && valor > 0) {
+    document.getElementById('custo-posto-kwh').textContent = 'R$ ' + (valor/kwh).toFixed(3) + '/kWh';
+    box.style.display = 'flex';
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+// ── Preview fatura ──
+function atualizarFatura() {
+  const kwh = parseFloat(document.getElementById('f-kwh').value);
+  const valor = parseFloat(document.getElementById('f-valor').value);
+  const kwhCarro = parseFloat(document.getElementById('f-kwh-carro').value);
+  const prev = document.getElementById('fatura-preview');
+  if (kwh > 0 && valor > 0 && kwhCarro > 0) {
+    const tarifa = valor / kwh;
+    const custoCarro = kwhCarro * tarifa;
+    const perc = (kwhCarro / kwh * 100).toFixed(1);
+    document.getElementById('f-custo-carro').textContent = 'R$ ' + custoCarro.toFixed(2);
+    document.getElementById('f-perc-carro').textContent = perc + '%';
+    document.getElementById('f-tarifa').textContent = 'R$ ' + tarifa.toFixed(4);
+    prev.style.display = 'block';
+  } else {
+    prev.style.display = 'none';
+  }
+}
+
+// ── API ──
+async function enviarParaSheets(aba, dados) {
+  if (!CONFIG.url) throw new Error('URL do Apps Script não configurada. Vá em Config.');
+  const res = await fetch(CONFIG.url, {
+    method: 'POST',
+    body: JSON.stringify({ aba, dados }),
+    headers: { 'Content-Type': 'text/plain' }
+  });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.erro || 'Erro desconhecido');
+  return json;
+}
+
+async function buscarDoSheets(aba) {
+  if (!CONFIG.url) return null;
+  const res = await fetch(CONFIG.url + '?aba=' + aba);
+  const json = await res.json();
+  return json.ok ? json.dados : null;
+}
+
+// ── Salvar carga ──
+async function salvarCarga() {
+  const btn = document.getElementById('btn-salvar-carga');
+  const ini = parseFloat(document.getElementById('c-bat-ini').value);
+  const fim = parseFloat(document.getElementById('c-bat-fim').value);
+  if (isNaN(ini) || isNaN(fim)) return toast('Informe % inicial e final da bateria', true);
+  if (fim <= ini) return toast('Bateria final deve ser maior que a inicial', true);
+
+  const kwhEst = (CONFIG.bateria * (fim - ini) / 100 / CONFIG.eficiencia).toFixed(2);
+  const custo = (parseFloat(kwhEst) * CONFIG.tarifa).toFixed(2);
+  const dados = [
+    document.getElementById('c-data').value.replace('T',' '),
+    'Casa',
+    ini, fim,
+    kwhEst, custo,
+    document.getElementById('c-km').value || '',
+    document.getElementById('c-obs').value || ''
+  ];
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Salvando...';
+  try {
+    await enviarParaSheets('Carregamentos', dados);
+    toast('Carga registrada no Sheets!');
+    document.getElementById('c-obs').value = '';
+    document.getElementById('c-km').value = '';
+    document.getElementById('c-bat-ini').value = fim;
+    document.getElementById('c-bat-fim').value = 100;
+    atualizarBateria();
+  } catch(e) { toast(e.message, true); }
+  btn.disabled = false;
+  btn.innerHTML = 'Salvar carga';
+}
+
+// ── Salvar posto ──
+async function salvarPosto() {
+  const btn = document.getElementById('btn-salvar-posto');
+  const kwh = parseFloat(document.getElementById('p-kwh').value);
+  const valor = parseFloat(document.getElementById('p-valor').value);
+  if (!document.getElementById('p-nome').value) return toast('Informe o nome do posto', true);
+  if (isNaN(kwh) || isNaN(valor)) return toast('Informe kWh e valor pagos', true);
+
+  const dados = [
+    document.getElementById('p-data').value.replace('T',' '),
+    document.getElementById('p-nome').value,
+    document.getElementById('p-cidade').value || '',
+    kwh, valor, '',
+    document.getElementById('p-km').value || '',
+    document.getElementById('p-obs').value || ''
+  ];
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Salvando...';
+  try {
+    await enviarParaSheets('Postos', dados);
+    toast('Posto registrado no Sheets!');
+    ['p-nome','p-cidade','p-kwh','p-valor','p-km','p-obs'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('custo-posto-box').style.display = 'none';
+  } catch(e) { toast(e.message, true); }
+  btn.disabled = false;
+  btn.innerHTML = 'Salvar posto';
+}
+
+// ── Salvar medidor ──
+async function salvarMedidor() {
+  const btn = document.getElementById('btn-salvar-medidor');
+  const leitura = parseFloat(document.getElementById('m-leitura').value);
+  if (isNaN(leitura)) return toast('Informe a leitura do medidor', true);
+
+  const dados = [
+    document.getElementById('m-data').value.replace('T',' '),
+    document.getElementById('m-tipo').value,
+    leitura, '',
+    document.getElementById('m-km').value || '',
+    document.getElementById('m-obs').value || ''
+  ];
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Salvando...';
+  try {
+    await enviarParaSheets('Medidor', dados);
+    toast('Leitura salva no Sheets!');
+    document.getElementById('m-leitura').value = '';
+    document.getElementById('m-km').value = '';
+    document.getElementById('m-obs').value = '';
+  } catch(e) { toast(e.message, true); }
+  btn.disabled = false;
+  btn.innerHTML = 'Salvar leitura';
+}
+
+// ── Salvar fatura ──
+async function salvarFatura() {
+  const btn = document.getElementById('btn-salvar-fatura');
+  const kwh = parseFloat(document.getElementById('f-kwh').value);
+  const valor = parseFloat(document.getElementById('f-valor').value);
+  if (!document.getElementById('f-mes').value) return toast('Informe o mês de referência', true);
+  if (isNaN(kwh) || isNaN(valor)) return toast('Informe kWh total e valor da fatura', true);
+
+  const dados = [
+    document.getElementById('f-mes').value,
+    document.getElementById('f-venc').value || '',
+    kwh, valor,
+    parseFloat(document.getElementById('f-kwh-carro').value) || 0,
+    '', '', '',
+    document.getElementById('f-bandeira').value,
+    document.getElementById('f-obs').value || ''
+  ];
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Salvando...';
+  try {
+    await enviarParaSheets('Faturas', dados);
+    toast('Fatura salva no Sheets!');
+    ['f-kwh','f-valor','f-kwh-carro','f-venc','f-obs'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('fatura-preview').style.display = 'none';
+  } catch(e) { toast(e.message, true); }
+  btn.disabled = false;
+  btn.innerHTML = 'Salvar fatura';
+}
+
+// ── Resumo ──
+async function carregarResumo() {
+  try {
+    const dados = await buscarDoSheets('resumo');
+    if (!dados) return;
+    const mapa = {};
+    dados.slice(1).forEach(row => { mapa[row[0]] = row[1]; });
+    const fmt = (v) => isNaN(parseFloat(v)) ? (v || '—') : 'R$ ' + parseFloat(v).toFixed(2);
+    const fmtN = (v) => isNaN(parseFloat(v)) ? '—' : parseFloat(v).toFixed(1);
+    document.getElementById('r-total').textContent = fmt(mapa['Total gasto com carro (R$)']);
+    document.getElementById('r-casa').textContent = fmt(mapa['Total gasto em casa - carregamentos (R$)']);
+    document.getElementById('r-postos').textContent = fmt(mapa['Total gasto em postos externos (R$)']);
+    document.getElementById('r-kwh-casa').textContent = fmtN(mapa['Total kWh carregado em casa']) + ' kWh';
+    document.getElementById('r-kwh-postos').textContent = fmtN(mapa['Total kWh carregado em postos']) + ' kWh';
+    document.getElementById('r-n-casa').textContent = mapa['Número de carregamentos em casa'] || '—';
+    document.getElementById('r-n-postos').textContent = mapa['Número de carregamentos em postos'] || '—';
+    document.getElementById('r-fatura-carro').textContent = fmt(mapa['Última fatura — custo carro (R$)']);
+  } catch(e) {}
+}
+
+// ── Histórico ──
+const COLUNAS = {
+  Carregamentos: ['Data/Hora','Tipo','% Ini','% Fim','kWh Est.','Custo','Km','Obs'],
+  Postos: ['Data/Hora','Posto','Cidade','kWh','Valor (R$)','R$/kWh','Km','Obs'],
+  Medidor: ['Data/Hora','Tipo','Leitura kWh','Diferença','Km','Obs'],
+  Faturas: ['Mês','Venc.','kWh Total','Valor (R$)','kWh Carro','Custo Carro','% Carro','Tarifa','Bandeira','Obs']
+};
+
+async function verHistorico(aba) {
+  document.querySelectorAll('.hist-btn').forEach(b => b.classList.remove('ativa'));
+  event && event.target.classList.add('ativa');
+
+  const thead = document.getElementById('thead-hist');
+  const tbody = document.getElementById('tbody-hist');
+  thead.innerHTML = '<tr>' + COLUNAS[aba].map(c => `<th>${c}</th>`).join('') + '</tr>';
+  tbody.innerHTML = '<tr><td class="vazio" colspan="99">Carregando...</td></tr>';
+
+  try {
+    const dados = await buscarDoSheets(aba);
+    if (!dados || dados.length <= 1) {
+      tbody.innerHTML = '<tr><td class="vazio" colspan="99">Nenhum registro ainda.</td></tr>';
+      return;
+    }
+    const linhas = dados.slice(1).reverse();
+    tbody.innerHTML = linhas.map(row => '<tr>' + row.map((c, i) => {
+      if (i === 1 && aba === 'Carregamentos') {
+        return `<td><span class="badge badge-casa">${c}</span></td>`;
+      }
+      if (i === 1 && aba === 'Medidor') {
+        const cls = c.includes('Antes') ? 'badge-antes' : c.includes('Depois') ? 'badge-depois' : 'badge-rotina';
+        return `<td><span class="badge ${cls}">${c}</span></td>`;
+      }
+      return `<td>${c !== undefined && c !== null ? c : '—'}</td>`;
+    }).join('') + '</tr>').join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td class="vazio" colspan="99">Configure a URL do Apps Script para ver o histórico.</td></tr>';
+  }
+}
+
+// ── Status API ──
+async function verificarConexao() {
+  const el = document.getElementById('status-api');
+  if (!CONFIG.url) { el.textContent = '● sem config'; return; }
+  try {
+    const r = await fetch(CONFIG.url);
+    const j = await r.json();
+    el.textContent = j.ok ? '● online' : '● erro';
+    el.style.color = j.ok ? '#9FE1CB' : '#F09595';
+  } catch(e) {
+    el.textContent = '● offline';
+    el.style.color = '#F09595';
+  }
+}
+
+// ── Toast ──
+function toast(msg, erro = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (erro ? ' erro' : '');
+  setTimeout(() => t.className = '', 3000);
+}
+</script>
+</body>
+</html>
