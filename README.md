@@ -1,104 +1,77 @@
 # ⚡ BYD Dolphin — Monitor de Energia
 
-Sistema para Victoria acompanhar os gastos de energia do BYD Dolphin Mini,
-integrando com Google Sheets via Apps Script.
+Dashboard de consumo de energia do BYD Dolphin Mini + conta de luz, publicado
+em GitHub Pages e atualizado automaticamente a partir do Google Sheets — mesmo
+padrão do Dashboard Financeiro, Pinho Law e MGO.
 
 ---
 
-## Estrutura do projeto
+## Arquitetura
 
 ```
-byd-monitor/
-├── index.html   ← front-end (hospedar no GitHub Pages)
-└── Code.gs      ← script do Google Sheets (colar no Apps Script)
+Google Sheets
+     │
+     ▼ (gspread via Service Account, somente leitura)
+fetch_data.py
+     │ injeta const DATA= no HTML
+     ▼
+dashboard.html  ──▶  GitHub Pages (https://atlassolucoes.github.io/byd/dashboard.html)
+     ▲
+GitHub Actions (08h/20h + push + manual)
 ```
 
----
-
-## Passo a passo de configuração
-
-### 1. Configurar o Google Apps Script
-
-1. Abra a planilha:
-   👉 https://docs.google.com/spreadsheets/d/1dyVsmvYX1rPnfNKMRh9qtEVlh84zrewA9fKB2TO4ivw/edit
-
-2. Clique em **Extensões → Apps Script**
-
-3. Apague o código que aparecer e cole todo o conteúdo do arquivo `Code.gs`
-
-4. Salve (Ctrl+S)
-
-5. No editor, selecione a função `setupPlanilha` no menu suspenso e clique em ▶ **Executar**
-   - Isso vai criar todas as abas com os cabeçalhos corretos
-   - Pode pedir permissão — aceite
-
-6. Agora clique em **Implantar → Nova implantação**
-   - Tipo: **App da Web**
-   - Descrição: `BYD Monitor v1`
-   - Executar como: **Eu (seu e-mail)**
-   - Quem tem acesso: **Qualquer pessoa**
-   - Clique em **Implantar**
-
-7. **Copie a URL gerada** — ela tem o formato:
-   `https://script.google.com/macros/s/XXXX.../exec`
+Diferente do desenho original deste projeto (Apps Script Web App recebendo
+gravações em tempo real do celular), aqui os dados são **digitados direto na
+planilha** e o dashboard só lê e exibe — assim evitamos o bloqueio de
+implantação de Apps Script que travou o Dashboard Financeiro. O arquivo
+`formulario-mobile.html` (Apps Script `Code.gs` + formulário mobile) continua
+no repositório como opção futura, caso valha a pena revisitar a gravação em
+tempo real via outro backend (ex. Cloudflare Worker).
 
 ---
 
-### 2. Hospedar no GitHub Pages
+## Configuração inicial (passos manuais, feitos uma única vez)
 
-1. Crie um repositório no GitHub chamado `byd-monitor`
+### 1. Compartilhar a planilha com a service account
 
-2. Faça upload do arquivo `index.html`
+A planilha precisa ser compartilhada como **Leitor** com:
+`agp-dashboard@agp-dashboard.iam.gserviceaccount.com`
+(mesma service account já usada no Pinho Law e MGO)
 
-3. Vá em **Settings → Pages**
-   - Source: **Deploy from a branch**
-   - Branch: `main` / pasta `/ (root)`
-   - Salve
+### 2. Criar a estrutura de abas
 
-4. Em alguns minutos o site estará disponível em:
-   `https://SEU_USUARIO.github.io/byd-monitor`
+1. Abra a planilha → **Extensões → Apps Script**
+2. Cole o conteúdo de `Code.gs`
+3. No menu suspenso, selecione a função `setupPlanilha` e clique em ▶ **Executar**
+   (isso só cria as abas com cabeçalho — **não precisa implantar como Web App**)
 
----
+### 3. Preencher os dados
 
-### 3. Conectar o front-end ao Sheets
-
-1. Abra o site no celular ou PC
-
-2. Toque na aba **Config**
-
-3. Cole a URL do Apps Script no campo indicado
-
-4. Ajuste a tarifa de energia (R$/kWh) conforme sua conta da Enel/Coelce
-
-5. Clique em **Salvar configurações**
-
-6. O indicador no topo deve mudar para **● online**
-
----
-
-## Como usar no dia a dia
-
-| Situação | Ação |
-|---|---|
-| Vai carregar em casa | Registre "Antes do carro" no medidor |
-| Terminou de carregar | Registre "Depois do carro" + carga em casa |
-| Carregou em posto externo | Registre em "Posto externo" com valor pago |
-| Chegou a conta de luz | Registre na aba "Fatura de luz" |
-| Leitura de rotina | Registre no medidor ao acordar e dormir |
+Registre direto nas abas da planilha (ou usando o app `formulario-mobile.html`
+localmente, se quiser testar a gravação via Apps Script por conta própria).
 
 ---
 
 ## Abas da planilha
 
-| Aba | O que guarda |
+| Aba | Colunas |
 |---|---|
-| **Carregamentos** | Cargas feitas em casa |
-| **Postos** | Cargas pagas em postos externos |
-| **Medidor** | Leituras do medidor de energia |
-| **Faturas** | Dados da conta de luz mensal |
-| **Resumo** | Totais calculados automaticamente |
+| **Carregamentos** | Data/Hora, Tipo, % Inicial, % Final, kWh Estimado, Custo (R$), Km Atual, Local / Observação |
+| **Postos** | Data/Hora, Nome do Posto, Cidade, kWh Carregados, Valor Total (R$), R$/kWh, Km Atual, Observação |
+| **Medidor** | Data/Hora, Tipo de Leitura, Leitura (kWh), Diferença (kWh), Km Carro, Observação |
+| **Faturas** | Mês Ref., Vencimento, kWh Total, Valor Total (R$), kWh Estimado Carro, Custo Carro (R$), % Carro na Fatura, Tarifa R$/kWh, Bandeira, Observação |
+
+O dashboard calcula os totais (gasto médio por kWh, gasto mensal, % da fatura
+referente ao carro etc.) no próprio HTML — a aba `Resumo` da planilha não é
+usada pelo dashboard.
 
 ---
+
+## Atualização automática
+
+Workflow roda **08h e 20h (Brasília)**, a cada push na `main`, e manualmente
+via **Actions → Update BYD Dashboard → Run workflow** (ou digitando
+"ATUALIZE O BYD" para a Claude disparar via API).
 
 ## Planilha
 
